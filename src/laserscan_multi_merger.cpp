@@ -8,10 +8,8 @@
 #include <pcl_ros/transforms.hpp>
 // #include <pcl/point_types.h>
 // #include <pcl/io/pcd_io.h>
-#include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <sensor_msgs/point_cloud_conversion.hpp> 
 // #include "pcl_ros/point_cloud.h"
 #include <Eigen/Dense>
 
@@ -82,7 +80,7 @@ void LaserscanMerger::laserscan_topic_parser()
 
     // make sure given topics are actual topics
     // make sure topic types are LaserScan
-    for(int i=0;i<tokens.size();++i)
+    for(uint i=0;i<tokens.size();++i)
     {
         for (auto const& topic : topics)
         {
@@ -115,7 +113,7 @@ void LaserscanMerger::laserscan_topic_parser()
             clouds_modified.resize(input_topics.size());
             clouds.resize(input_topics.size());
             RCLCPP_INFO(this->get_logger(),"Subscribing to topics\t%ld", scan_subscribers.size());
-            for(int i=0; i<input_topics.size(); ++i)
+            for(uint i=0; i<input_topics.size(); ++i)
             {
                 // workaround for std::bind https://github.com/ros2/rclcpp/issues/583
                 std::function<void(const sensor_msgs::msg::LaserScan::SharedPtr)> callback = std::bind(&LaserscanMerger::scanCallback,
@@ -157,7 +155,7 @@ LaserscanMerger::LaserscanMerger()
 
 void LaserscanMerger::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
 {
-    sensor_msgs::msg::PointCloud tmpCloud1;
+    //sensor_msgs::msg::PointCloud tmpCloud1;
     sensor_msgs::msg::PointCloud2 tmpCloud2, tmpCloud3;
 
     // Verify that TF knows how to transform from the received scan to the destination scan frame
@@ -167,7 +165,7 @@ void LaserscanMerger::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
     //sensor_msgs::convertPointCloudToPointCloud2(tmpCloud1,tmpCloud2);
     pcl_ros::transformPointCloud(this->destination_frame.c_str(), tmpCloud2, tmpCloud3, *tf_buffer_);
 
-    for(int i=0; i<input_topics.size(); ++i)
+    for(uint i=0; i<input_topics.size(); ++i)
     {
         if(topic.compare(input_topics[i]) == 0)
         {
@@ -177,8 +175,8 @@ void LaserscanMerger::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
     }	
 
     // Count how many scans we have
-    int totalClouds = 0;
-    for(int i=0; i<clouds_modified.size(); ++i)
+    uint totalClouds = 0;
+    for(uint i=0; i<clouds_modified.size(); ++i)
         if(clouds_modified[i])
             ++totalClouds;
 
@@ -188,7 +186,7 @@ void LaserscanMerger::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
         pcl::PCLPointCloud2 merged_cloud = clouds[0];
         clouds_modified[0] = false;
 
-        for(int i=1; i<clouds_modified.size(); ++i)
+        for(uint i=1; i<clouds_modified.size(); ++i)
         {
             pcl::concatenate(merged_cloud, clouds[i], merged_cloud);
             clouds_modified[i] = false;
