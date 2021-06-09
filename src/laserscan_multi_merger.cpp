@@ -13,6 +13,11 @@
 // #include "pcl_ros/point_cloud.h"
 #include <Eigen/Dense>
 
+#include<iostream>
+#include<algorithm>
+#include <thread>
+#include <chrono>
+
 using namespace std;
 using namespace pcl;
 
@@ -71,23 +76,43 @@ void LaserscanMerger::reconfigureCallback()
 
 void LaserscanMerger::laserscan_topic_parser()
 {
-    std::map<std::string, std::vector<std::string> > topics = this->get_topic_names_and_types(); //first:name, second:type
+    // Necessity for sleep workaround to get topics
+    // https://github.com/ros2/ros2/issues/1057
 
-    istringstream iss(laserscan_topics);
-    vector<string> tokens;
-    copy(istream_iterator<string>(iss), istream_iterator<string>(), back_inserter<vector<string> >(tokens));
+    std::map<std::string, std::vector<std::string> > topics;
+    uint r = 0;
+    while (topics.size() < 3){
+        topics = this->get_topic_names_and_types(); //first:name, second:type
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (++r > 5){
+            RCLCPP_ERROR(this->get_logger(),"No published topics found!");
+            return;
+        }
+    }
+
+    std::vector<std::string> published_scan_topics;
+    for (auto const &topic: topics)
+     {
+         if (topic.second[0].compare("sensor_msgs/msg/LaserScan") == 0)
+         {
+            std::string topic_name = topic.first;
+            if (topic_name.at(0) == '/')
+                topic_name = topic_name.substr(1);
+            published_scan_topics.push_back(topic_name);
+         }
+     }
+
+    istringstream iss(this->laserscan_topics);
+    vector<string> tokens ((istream_iterator<string>(iss)), istream_iterator<string>());
     vector<string> tmp_input_topics;
 
-    // make sure given topics are actual topics
-    // make sure topic types are LaserScan
-    for(uint i=0;i<tokens.size();++i)
+    // make sure given topics are published LaserScan topics
+    for(auto const& token: tokens)
     {
-        for (auto const& topic : topics)
+        if (std::find(published_scan_topics.begin(), published_scan_topics.end(), token) != published_scan_topics.end())
         {
-            if( (tokens[i].compare(topic.first) == 0) && (topic.second[0].compare("sensor_msgs/msg/LaserScan") == 0) )
-            {
-                tmp_input_topics.push_back(topic.first);
-            }
+            tmp_input_topics.push_back(token);
+        
         }
     }
 
@@ -112,7 +137,11 @@ void LaserscanMerger::laserscan_topic_parser()
             scan_subscribers.resize(input_topics.size());
             clouds_modified.resize(input_topics.size());
             clouds.resize(input_topics.size());
-            RCLCPP_INFO(this->get_logger(),"Subscribing to topics\t%ld", scan_subscribers.size());
+            std::stringstream output_info;
+            std::copy(input_topics.begin(), input_topics.end(),std::ostream_iterator<std::string>(output_info," "));
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Subscribing to %ld topics: %s.", scan_subscribers.size(), output_info.str().c_str());
             for(uint i=0; i<input_topics.size(); ++i)
             {
                 // workaround for std::bind https://github.com/ros2/rclcpp/issues/583
@@ -132,7 +161,7 @@ void LaserscanMerger::laserscan_topic_parser()
 LaserscanMerger::LaserscanMerger()
     : Node("laser_multi_merger")
 {
-    tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    //tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     this->declare_parameter<std::string>("destination_frame", "dest_frame");
     this->declare_parameter<std::string>("cloud_destination_topic", "/merged_cloud");
@@ -146,23 +175,21 @@ LaserscanMerger::LaserscanMerger()
     this->declare_parameter("range_min", 0.45);
     this->declare_parameter("range_max", 25.0);
 
+    this->reconfigureCallback();
+
     this->laserscan_topic_parser();
 
-    point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (cloud_destination_topic.c_str(), 1);
-    laser_scan_publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan> (scan_destination_topic.c_str(), 1);
+    point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (this->cloud_destination_topic.c_str(), 1);
+    laser_scan_publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan> (this->scan_destination_topic.c_str(), 1);
 
 }
 
 void LaserscanMerger::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
 {
-    //sensor_msgs::msg::PointCloud tmpCloud1;
     sensor_msgs::msg::PointCloud2 tmpCloud2, tmpCloud3;
 
-    // Verify that TF knows how to transform from the received scan to the destination scan frame
     tf_buffer_->canTransform(scan->header.frame_id.c_str(), destination_frame.c_str(), scan->header.stamp, rclcpp::Duration(1));
     projector_.transformLaserScanToPointCloud(scan->header.frame_id, *scan, tmpCloud2, *tf_buffer_, laser_geometry::channel_option::Distance);
-    
-    //sensor_msgs::convertPointCloudToPointCloud2(tmpCloud1,tmpCloud2);
     pcl_ros::transformPointCloud(this->destination_frame.c_str(), tmpCloud2, tmpCloud3, *tf_buffer_);
 
     for(uint i=0; i<input_topics.size(); ++i)
