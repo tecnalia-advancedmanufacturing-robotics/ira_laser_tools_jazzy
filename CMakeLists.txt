@@ -1,7 +1,29 @@
 cmake_minimum_required(VERSION 3.5)
 project(ira_laser_tools)
 
-set(dependencies laser_geometry rclcpp sensor_msgs std_msgs tf2_ros pcl_conversions pcl_ros EIGEN3 PCL)
+# Default to C99
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 99)
+endif()
+
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+set(dependencies 
+  laser_geometry 
+  rclcpp 
+  sensor_msgs 
+  std_msgs 
+  tf2_ros 
+  pcl_conversions 
+  pcl_ros 
+  EIGEN3 PCL)
 
 find_package(ament_cmake REQUIRED)
 find_package(laser_geometry REQUIRED)
@@ -14,10 +36,6 @@ find_package(pcl_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 
-ament_export_include_directories(include)
-ament_export_dependencies($({dependencies}))
-ament_export_libraries(laser_merger)
-
 ###########
 ## Build ##
 ###########
@@ -25,21 +43,16 @@ ament_export_libraries(laser_merger)
 add_executable(laserscan_multi_merger src/laserscan_multi_merger.cpp)
 ament_target_dependencies(laserscan_multi_merger ${dependencies})
 
-add_executable(laserscan_virtualizer src/laserscan_virtualizer.cpp)
-ament_target_dependencies(laserscan_virtualizer ${dependencies})
+#add_executable(laserscan_virtualizer src/laserscan_virtualizer.cpp)
+#ament_target_dependencies(laserscan_virtualizer ${dependencies})
 
 #############
 ## Install ##
 #############
 
 install(TARGETS
-  laserscan_multi_merger laserscan_virtualizer
+  laserscan_multi_merger
   DESTINATION lib/${PROJECT_NAME})
-
-install(DIRECTORY
-  launch 
-  DESTINATION share/${PROJECT_NAME}
-)
 
 #############
 ## Testing ##
@@ -49,3 +62,9 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_include_directories(include)
+ament_export_dependencies($({dependencies}))
+ament_export_libraries(laser_merger)
+
+ament_package()
