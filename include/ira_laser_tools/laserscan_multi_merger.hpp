@@ -18,8 +18,8 @@
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 // #include "pcl_ros/point_cloud.h"
 
-#include<iostream>
-#include<algorithm>
+#include <iostream>
+#include <algorithm>
 #include <thread>
 #include <chrono>
 
@@ -40,7 +40,7 @@ private:
   laser_geometry::LaserProjection projector_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_publisher_;
-  std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr > scan_subscribers;
+  std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr> scan_subscribers;
   std::vector<bool> clouds_modified;
   std::vector<pcl::PCLPointCloud2> clouds;
   std::vector<std::string> input_topics;
