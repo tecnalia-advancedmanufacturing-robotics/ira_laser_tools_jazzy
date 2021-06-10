@@ -23,7 +23,7 @@ set(dependencies
   tf2_ros 
   pcl_conversions 
   pcl_ros 
-  EIGEN3 PCL)
+  )
 
 find_package(ament_cmake REQUIRED)
 find_package(laser_geometry REQUIRED)
@@ -38,10 +38,15 @@ find_package(Eigen3 REQUIRED)
 
 ###########
 ## Build ##
+
 ###########
 
+include_directories(
+  include
+)
+
 add_executable(laserscan_multi_merger src/laserscan_multi_merger.cpp)
-ament_target_dependencies(laserscan_multi_merger ${dependencies})
+ament_target_dependencies(laserscan_multi_merger ${dependencies} PCL)
 
 #add_executable(laserscan_virtualizer src/laserscan_virtualizer.cpp)
 #ament_target_dependencies(laserscan_virtualizer ${dependencies})
@@ -49,6 +54,14 @@ ament_target_dependencies(laserscan_multi_merger ${dependencies})
 #############
 ## Install ##
 #############
+
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(TARGETS
   laserscan_multi_merger
