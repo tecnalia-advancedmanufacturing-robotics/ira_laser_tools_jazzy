@@ -15,15 +15,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set(dependencies 
-  laser_geometry 
-  rclcpp 
-  sensor_msgs 
-  std_msgs 
-  tf2_ros 
-  pcl_conversions 
-  pcl_ros 
-  )
+set(dependencies
+  laser_geometry
+  rclcpp
+  sensor_msgs
+  std_msgs
+  tf2_ros
+  pcl_conversions
+  pcl_ros
+)
 
 find_package(ament_cmake REQUIRED)
 find_package(laser_geometry REQUIRED)
