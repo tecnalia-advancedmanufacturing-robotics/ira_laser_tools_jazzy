@@ -23,13 +23,13 @@ LaserscanMerger::LaserscanMerger()
   laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "");
   min_height = this->declare_parameter("min_height", std::numeric_limits<double>::min());
   max_height = this->declare_parameter("max_height", std::numeric_limits<double>::max());
-  angle_min = this->declare_parameter("angle_min", -2.36);
-  angle_max = this->declare_parameter("angle_max", 2.36);
-  angle_increment = this->declare_parameter("angle_increment", 0.0058);
+  angle_min = this->declare_parameter("angle_min", -M_PI);
+  angle_max = this->declare_parameter("angle_max", M_PI);
+  angle_increment = this->declare_parameter("angle_increment", M_PI / 180.0);
   time_increment = this->declare_parameter("time_increment", 0);
-  scan_time = this->declare_parameter("scan_time", 0.0333333);
-  range_min = this->declare_parameter("range_min", 0.45);
-  range_max = this->declare_parameter("range_max", 25.0);
+  scan_time = this->declare_parameter("scan_time", 1.0 / 30.0);
+  range_min = this->declare_parameter("range_min", 0.0);
+  range_max = this->declare_parameter("range_max", std::numeric_limits<double>::max());
   use_inf = this->declare_parameter("use_inf", true);
   inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
 

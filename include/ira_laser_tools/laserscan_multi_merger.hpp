@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <math.h>
 
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
