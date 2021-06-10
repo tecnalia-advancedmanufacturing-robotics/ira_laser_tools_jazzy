@@ -1,29 +1,25 @@
 #ifndef IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
 #define IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
 
-#include "rclcpp/rclcpp.hpp"
-#include <string.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer_interface.h>
-//#include <pcl_ros/transforms.h>
-#include <laser_geometry/laser_geometry.hpp>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl_ros/transforms.hpp>
-// #include <pcl/point_types.h>
-// #include <pcl/io/pcd_io.h>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include "sensor_msgs/point_cloud2_iterator.hpp"
-// #include "pcl_ros/point_cloud.h"
-
 #include <iostream>
 #include <algorithm>
-#include <thread>
-#include <chrono>
+#include <string>
+#include <memory>
+#include <vector>
 
-using namespace pcl;
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer_interface.h"
+#include "pcl_conversions/pcl_conversions.h"
+#include "pcl/point_cloud.h"
+#include "rclcpp/rclcpp.hpp"
+
+#include "laser_geometry/laser_geometry.hpp"
+#include "pcl_ros/transforms.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+#include "sensor_msgs/point_cloud2_iterator.hpp"
+
 namespace laserscan_multi_merger
 {
 class LaserscanMerger : public rclcpp::Node
@@ -64,6 +60,6 @@ private:
   std::string laserscan_topics;
 };
 
-} // namespace laserscan_multi_merger
+}  // namespace laserscan_multi_merger
 
 #endif  // IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
