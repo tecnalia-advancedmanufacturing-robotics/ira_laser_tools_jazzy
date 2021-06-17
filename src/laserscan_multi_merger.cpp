@@ -73,22 +73,22 @@ void LaserscanMerger::laserscan_topic_parser()
   std::istringstream iss(this->laserscan_topics);
   std::vector<std::string> tokens((std::istream_iterator<std::string>(
       iss)), std::istream_iterator<std::string>());
-  std::vector<std::string> tmp_input_topics;
+  std::vector<std::string> tmp_input_topics = tokens;
 
-  // make sure given topics are published LaserScan topics
-  for (auto const & token : tokens) {
-    if (std::find(
-        published_scan_topics.begin(), published_scan_topics.end(),
-        token) != published_scan_topics.end())
-    {
-      tmp_input_topics.push_back(token);
-    } else {
-      RCLCPP_WARN(
-        this->get_logger(),
-        "Topic %s [sensor_msg/LaserScan] does not seem to be published yet. Could not subscribe.",
-        token);
-    }
-  }
+  // // make sure given topics are published LaserScan topics
+  // for (auto const & token : tokens) {
+  //   if (std::find(
+  //       published_scan_topics.begin(), published_scan_topics.end(),
+  //       token) != published_scan_topics.end())
+  //   {
+  //     tmp_input_topics.push_back(token);
+  //   } else {
+  //     RCLCPP_WARN(
+  //       this->get_logger(),
+  //       "Topic %s [sensor_msg/LaserScan] does not seem to be published yet. Could not subscribe.",
+  //       token);
+  //   }
+  // }
 
   // clean up duplicate topics
   std::sort(tmp_input_topics.begin(), tmp_input_topics.end());
