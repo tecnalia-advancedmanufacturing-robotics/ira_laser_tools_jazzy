@@ -41,6 +41,8 @@ private:
   std::vector<bool> clouds_modified;
   std::vector<pcl::PCLPointCloud2> clouds;
   std::vector<std::string> input_topics;
+  std::vector<std::string> subscribed_topics;
+  rclcpp::TimerBase::SharedPtr topic_parser_timer;
 
   double angle_min;
   double angle_max;

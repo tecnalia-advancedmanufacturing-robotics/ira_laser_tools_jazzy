@@ -33,7 +33,8 @@ LaserscanMerger::LaserscanMerger()
   use_inf = this->declare_parameter("use_inf", true);
   inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
 
-  this->laserscan_topic_parser();
+  topic_parser_timer = this->create_wall_timer(
+    std::chrono::seconds(5), std::bind(&LaserscanMerger::laserscan_topic_parser, this));
 
   this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   this->tfListener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);
@@ -50,7 +51,7 @@ void LaserscanMerger::laserscan_topic_parser()
   // https://github.com/ros2/ros2/issues/1057
   std::map<std::string, std::vector<std::string>> topics;
   uint r = 0;
-  while (topics.size() < 3) {
+  while (topics.size() < 3) { // parameter_events & rosout
     topics = this->get_topic_names_and_types();  // first:name, second:type
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     if (++r > 5) {
@@ -73,61 +74,60 @@ void LaserscanMerger::laserscan_topic_parser()
   std::istringstream iss(this->laserscan_topics);
   std::vector<std::string> tokens((std::istream_iterator<std::string>(
       iss)), std::istream_iterator<std::string>());
-  std::vector<std::string> tmp_input_topics = tokens;
+  std::vector<std::string> tmp_input_topics;
 
-  // // make sure given topics are published LaserScan topics
-  // for (auto const & token : tokens) {
-  //   if (std::find(
-  //       published_scan_topics.begin(), published_scan_topics.end(),
-  //       token) != published_scan_topics.end())
-  //   {
-  //     tmp_input_topics.push_back(token);
-  //   } else {
-  //     RCLCPP_WARN(
-  //       this->get_logger(),
-  //       "Topic %s [sensor_msg/LaserScan] does not seem to be published yet. Could not subscribe.",
-  //       token);
-  //   }
-  // }
+  // make sure missing topics are published LaserScan topics
+  for (auto const & token : tokens) {
+    if (std::find(
+        subscribed_topics.begin(), subscribed_topics.end(),
+        token) == subscribed_topics.end())
+    {
+      if (std::find(
+          published_scan_topics.begin(), published_scan_topics.end(),
+          token) != published_scan_topics.end())
+      {
+        tmp_input_topics.push_back(token);
+      } else {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Topic %s [sensor_msg/LaserScan] does not seem to be published yet. Could not subscribe.",
+          token.c_str());
+      }
+    }
+  }
 
   // clean up duplicate topics
   std::sort(tmp_input_topics.begin(), tmp_input_topics.end());
   std::vector<std::string>::iterator last =
     std::unique(tmp_input_topics.begin(), tmp_input_topics.end());
   tmp_input_topics.erase(last, tmp_input_topics.end());
-
-
-  // Do not re-subscribe if the topics are the same
-  if ( (tmp_input_topics.size() != input_topics.size()) ||
-    !equal(tmp_input_topics.begin(), tmp_input_topics.end(), input_topics.begin()))
-  {
-    input_topics = tmp_input_topics;
-    if (input_topics.size() > 0) {
-      scan_subscribers.resize(input_topics.size());
-      clouds_modified.resize(input_topics.size());
-      clouds.resize(input_topics.size());
-      std::stringstream output_info;
-      std::copy(
-        input_topics.begin(), input_topics.end(),
-        std::ostream_iterator<std::string>(output_info, " "));
+  input_topics = tmp_input_topics;
+  
+  // Create subscriptions
+  if (input_topics.size() > 0) {
+    scan_subscribers.resize(input_topics.size());
+    clouds_modified.resize(input_topics.size());
+    clouds.resize(input_topics.size());
+    std::stringstream output_info;
+    std::copy(
+      input_topics.begin(), input_topics.end(),
+      std::ostream_iterator<std::string>(output_info, " "));
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Subscribing to %ld topics.", scan_subscribers.size());
+    for (uint i = 0; i < input_topics.size(); ++i) {
+      // workaround for std::bind https://github.com/ros2/rclcpp/issues/583
+      std::function<void(const sensor_msgs::msg::LaserScan::SharedPtr)> callback =
+        std::bind(
+        &LaserscanMerger::scanCallback,
+        this, std::placeholders::_1, input_topics[i]);
+      scan_subscribers[i] = this->create_subscription<
+        sensor_msgs::msg::LaserScan>(input_topics[i].c_str(), 1, callback);
       RCLCPP_INFO(
         this->get_logger(),
-        "Subscribing to %ld topics.", scan_subscribers.size());
-      for (uint i = 0; i < input_topics.size(); ++i) {
-        // workaround for std::bind https://github.com/ros2/rclcpp/issues/583
-        std::function<void(const sensor_msgs::msg::LaserScan::SharedPtr)> callback =
-          std::bind(
-          &LaserscanMerger::scanCallback,
-          this, std::placeholders::_1, input_topics[i]);
-        scan_subscribers[i] = this->create_subscription<
-          sensor_msgs::msg::LaserScan>(input_topics[i].c_str(), 1, callback);
-        RCLCPP_INFO(
-          this->get_logger(),
-          "Subscribed to %s.", input_topics[i].c_str());
-        clouds_modified[i] = false;
-      }
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Not subscribed to any topic.");
+        "Subscribed to %s.", input_topics[i].c_str());
+      clouds_modified[i] = false;
+      subscribed_topics.push_back(input_topics[i]);
     }
   }
 }
@@ -136,6 +136,10 @@ void LaserscanMerger::scanCallback(
   const sensor_msgs::msg::LaserScan::SharedPtr scan,
   std::string topic)
 {
+  RCLCPP_DEBUG(
+  this->get_logger(),
+  "Scan callback of %s", topic.c_str());
+
   sensor_msgs::msg::PointCloud2 singleScanCloud;
 
   // transform scan if necessary
