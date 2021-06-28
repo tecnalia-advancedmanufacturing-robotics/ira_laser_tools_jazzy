@@ -8,15 +8,16 @@
 #include <vector>
 #include <math.h>
 
+#include "rclcpp/rclcpp.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer_interface.h"
+
 #include "pcl_conversions/pcl_conversions.h"
+#include "pcl_ros/transforms.hpp"
 #include "pcl/point_cloud.h"
-#include "rclcpp/rclcpp.hpp"
 
 #include "laser_geometry/laser_geometry.hpp"
-#include "pcl_ros/transforms.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
@@ -27,9 +28,15 @@ class LaserscanMerger : public rclcpp::Node
 {
 public:
   LaserscanMerger();
-  void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic);
-  void pointcloud_to_laserscan(sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud_msg);
   void laserscan_topic_parser();
+  void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic);
+  sensor_msgs::msg::PointCloud2::SharedPtr merge_laser_scan_to_pointcloud(
+    const sensor_msgs::msg::LaserScan::SharedPtr scan,
+    std::string topic);
+  sensor_msgs::msg::LaserScan::UniquePtr pointcloud_to_laserscan(
+    sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud_msg);
+  sensor_msgs::msg::PointCloud2::SharedPtr laser_scan_to_pointcloud(
+    const sensor_msgs::msg::LaserScan::SharedPtr scan);
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 
