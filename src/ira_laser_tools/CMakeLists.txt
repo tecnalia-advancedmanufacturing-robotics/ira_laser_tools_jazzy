@@ -50,10 +50,11 @@ include_directories(
 
 add_executable(laserscan_multi_merger src/laserscan_multi_merger.cpp)
 ament_target_dependencies(laserscan_multi_merger ${dependencies})
-target_link_libraries(laserscan_multi_merger ${PCL_LIBRARIES})
+target_link_libraries(laserscan_multi_merger CloudPile ${PCL_LIBRARIES})
 
-#add_executable(laserscan_virtualizer src/laserscan_virtualizer.cpp)
-#ament_target_dependencies(laserscan_virtualizer ${dependencies})
+add_library(CloudPile src/CloudPile.cpp)
+ament_target_dependencies(CloudPile rclcpp pcl_ros)
+target_link_libraries(CloudPile ${PCL_LIBRARIES})
 
 #############
 ## Install ##
@@ -68,7 +69,7 @@ install(DIRECTORY launch
 )
 
 install(TARGETS
-  laserscan_multi_merger
+  laserscan_multi_merger CloudPile
   DESTINATION lib/${PROJECT_NAME})
 
 #############

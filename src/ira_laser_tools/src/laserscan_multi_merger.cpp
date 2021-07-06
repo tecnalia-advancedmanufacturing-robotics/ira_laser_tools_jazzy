@@ -13,14 +13,14 @@ namespace laserscan_multi_merger
 LaserscanMerger::LaserscanMerger()
 : Node("laser_multi_merger")
 {
-  destination_frame = this->declare_parameter<std::string>("destination_frame", "dest_link");
+  destination_frame = this->declare_parameter<std::string>("destination_frame", "base_link");
   cloud_destination_topic = this->declare_parameter<std::string>(
     "cloud_destination_topic",
     "/merged_cloud");
   scan_destination_topic = this->declare_parameter<std::string>(
     "scan_destination_topic",
-    "/merged_scan");
-  laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "");
+    "/scan");
+  laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "f_scan b_scan");
   min_height = this->declare_parameter("min_height", std::numeric_limits<double>::min());
   max_height = this->declare_parameter("max_height", std::numeric_limits<double>::max());
   angle_min = this->declare_parameter("angle_min", -M_PI);
@@ -32,6 +32,8 @@ LaserscanMerger::LaserscanMerger()
   range_max = this->declare_parameter("range_max", std::numeric_limits<double>::max());
   use_inf = this->declare_parameter("use_inf", true);
   inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
+  lat_sec_max = this->declare_parameter("max_lat_sec", 3.0);
+  best_effort_enabled = this->declare_parameter<bool>("best_effort", false);
 
   topic_parser_timer = this->create_wall_timer(
     std::chrono::seconds(5), std::bind(&LaserscanMerger::laserscan_topic_parser, this));
@@ -102,8 +104,6 @@ void LaserscanMerger::laserscan_topic_parser()
   // Create subscriptions
   if (input_topics.size() > 0) {
     scan_subscribers.resize(input_topics.size());
-    clouds_modified.resize(input_topics.size());
-    clouds.resize(input_topics.size());
     std::stringstream output_info;
     std::copy(
       input_topics.begin(), input_topics.end(),
@@ -123,7 +123,6 @@ void LaserscanMerger::laserscan_topic_parser()
       RCLCPP_INFO(
         this->get_logger(),
         "Subscribed to %s.", input_topics[i].c_str());
-      clouds_modified[i] = false;
       subscribed_topics.push_back(input_topics[i]);
     }
   }
@@ -133,61 +132,93 @@ void LaserscanMerger::scanCallback(
   const sensor_msgs::msg::LaserScan::SharedPtr scan,
   std::string topic)
 {
-
   RCLCPP_DEBUG(
   this->get_logger(),
   "Scan callback of %s, merging.. ", topic.c_str());
 
-  // merge_laser_scan_to_pointcloud returns full scan or NULL
-  auto merged_cloud_msg = merge_laser_scan_to_pointcloud(scan, topic);
-  if (merged_cloud_msg == NULL)
-    return;
-  
-  this->point_cloud_publisher_->publish(*merged_cloud_msg);
-  auto merged_scan_msg = pointcloud_to_laserscan(merged_cloud_msg);
-  if (merged_scan_msg)
-    this->laser_scan_publisher_->publish(std::move(merged_scan_msg)); 
+  laser_scan_to_cloud_deque(scan, topic);
+  update_cloud_queue();
 }
 
-sensor_msgs::msg::PointCloud2::SharedPtr LaserscanMerger::merge_laser_scan_to_pointcloud(
+void LaserscanMerger::laser_scan_to_cloud_deque(
   const sensor_msgs::msg::LaserScan::SharedPtr scan,
   std::string topic){
 
+  pcl::PCLPointCloud2 pcl_cloud; 
   auto singleScanCloud = laser_scan_to_pointcloud(scan);
+  pcl_conversions::toPCL(*singleScanCloud, pcl_cloud);
+  int topic_index = get_topic_index(topic);
 
-  // transform to pcl
-  for (uint i = 0; i < input_topics.size(); ++i) {
-    if (topic.compare(input_topics[i]) == 0) {
-      pcl_conversions::toPCL(*singleScanCloud, clouds[i]);
-      clouds_modified[i] = true;
-    }
+  int pile_index = get_matching_pile(topic_index, scan->header.stamp);
+
+  if (pile_index > 0){
+    cloud_deque[pile_index].add(topic_index, pcl_cloud);
+    // latestCloudPile.add(topic_index, pcl_cloud);
+    // yes: add to pile
   }
-
-  // Count how many scans we have
-  uint totalClouds = 0;
-  for (uint i = 0; i < clouds_modified.size(); ++i) {
-    if (clouds_modified[i]) {
-      ++totalClouds;
-    }
+  else{
+    // no: create new pile
+    this->cloud_deque.push_back(
+      CloudPile(pcl_cloud, scan->header.stamp, topic_index, subscribed_topics.size()));
   }
-
-  // Go ahead only if all subscribed scans have arrived
-  if (totalClouds == clouds_modified.size()) {
-    pcl::PCLPointCloud2 merged_cloud = clouds[0];
-    clouds_modified[0] = false;
-
-    for (uint i = 1; i < clouds_modified.size(); ++i) {
-      pcl::concatenate(merged_cloud, clouds[i], merged_cloud);
-      clouds_modified[i] = false;
-    }
-
-    auto cloud_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
-    pcl_conversions::moveFromPCL(merged_cloud, *cloud_msg);
-    return cloud_msg;
-  }
-
-  return 0;
 }
+
+int LaserscanMerger::get_matching_pile(int topic_index, builtin_interfaces::msg::Time time_stamp)
+{
+  for (uint i=0; i<cloud_deque.size(); ++i)
+  {
+    if(cloud_deque[i].is_index_filled(topic_index))
+    {
+      continue;
+    }
+    else if(cloud_deque[i].get_stamp_time() == rclcpp::Time(time_stamp))
+    {
+      return i;
+    } 
+  }
+  return -1;   // no matching index found
+}
+
+void LaserscanMerger::update_cloud_queue(){
+  if (cloud_deque.front().is_complete()){
+    publish_latest_cloud_and_scan();
+  }
+  else if(abs((this->get_clock()->now() - cloud_deque.front().get_stamp_time()).seconds()) > 0.1){
+    if(this->best_effort_enabled)
+      publish_latest_cloud_and_scan();
+    else
+      cloud_deque.pop_front();
+  }
+}
+
+
+int LaserscanMerger::get_topic_index(std::string topic){
+  for (uint i = 0; i < subscribed_topics.size(); ++i) {
+    if (topic.compare(subscribed_topics[i]) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void LaserscanMerger::publish_latest_cloud_and_scan(){
+
+  auto front_pile = cloud_deque.front();
+  pcl::PCLPointCloud2 merged_cloud_pcl = front_pile.merge_to_one_cloud();
+
+  auto cloud_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
+  pcl_conversions::moveFromPCL(merged_cloud_pcl, *cloud_msg);
+
+  cloud_deque.pop_front();
+
+  this->point_cloud_publisher_->publish(*cloud_msg);
+  auto merged_scan_msg = pointcloud_to_laserscan(cloud_msg);
+    if (merged_scan_msg){
+      this->laser_scan_publisher_->publish(std::move(merged_scan_msg));
+    }
+}
+
+/* Basic conversions */
 
 sensor_msgs::msg::PointCloud2::SharedPtr LaserscanMerger::laser_scan_to_pointcloud(
   const sensor_msgs::msg::LaserScan::SharedPtr scan){
@@ -314,6 +345,7 @@ sensor_msgs::msg::LaserScan::UniquePtr LaserscanMerger::pointcloud_to_laserscan(
 }
 
 }  // namespace laserscan_multi_merger
+
 
 int main(int argc, char * argv[])
 {
