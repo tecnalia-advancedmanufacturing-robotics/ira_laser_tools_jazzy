@@ -50,6 +50,7 @@ private:
   void pub_or_delete_clouds();
   void update_cloud_queue();
   void publish_latest_cloud_and_scan();
+  bool is_scan_too_old(const builtin_interfaces::msg::Time stamp_time);
   int get_matching_pile(int topic_index, builtin_interfaces::msg::Time time_stamp);
 
   laser_geometry::LaserProjection projector_;
@@ -62,7 +63,9 @@ private:
   std::vector<std::string> subscribed_topics;
   rclcpp::TimerBase::SharedPtr topic_parser_timer;
 
-  double lat_sec_max;  // max amount of time to wait for matching scans to merge
+  bool allow_scan_delay;            // allow scan to be delayed (max_delay_time_sec)
+  double max_delay_time_sec;        // max delay amount of a scan to node time
+  double max_merge_time_diff_sec;   // max difference in scan time of merged scans
 
   double angle_min;
   double angle_max;

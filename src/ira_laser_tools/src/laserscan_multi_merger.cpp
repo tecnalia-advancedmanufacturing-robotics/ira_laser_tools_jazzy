@@ -13,14 +13,14 @@ namespace laserscan_multi_merger
 LaserscanMerger::LaserscanMerger()
 : Node("laser_multi_merger")
 {
-  destination_frame = this->declare_parameter<std::string>("destination_frame", "base_link");
+  destination_frame = this->declare_parameter<std::string>("destination_frame", "dest_link");
   cloud_destination_topic = this->declare_parameter<std::string>(
     "cloud_destination_topic",
     "/merged_cloud");
   scan_destination_topic = this->declare_parameter<std::string>(
     "scan_destination_topic",
-    "/scan");
-  laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "f_scan b_scan");
+    "/merged_scan");
+  laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "");
   min_height = this->declare_parameter("min_height", std::numeric_limits<double>::min());
   max_height = this->declare_parameter("max_height", std::numeric_limits<double>::max());
   angle_min = this->declare_parameter("angle_min", -M_PI);
@@ -32,8 +32,10 @@ LaserscanMerger::LaserscanMerger()
   range_max = this->declare_parameter("range_max", std::numeric_limits<double>::max());
   use_inf = this->declare_parameter("use_inf", true);
   inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
-  lat_sec_max = this->declare_parameter("max_lat_sec", 3.0);
-  best_effort_enabled = this->declare_parameter<bool>("best_effort", false);
+  best_effort_enabled = this->declare_parameter<bool>("best_effort", true);
+  allow_scan_delay = this->declare_parameter("allow_scan_delay", false);
+  max_delay_time_sec = this->declare_parameter("max_delay_scan_time", 1.0);
+  max_merge_time_diff_sec = this->declare_parameter("max_merge_time_diff", 0.05);
 
   topic_parser_timer = this->create_wall_timer(
     std::chrono::seconds(5), std::bind(&LaserscanMerger::laserscan_topic_parser, this));
@@ -136,8 +138,26 @@ void LaserscanMerger::scanCallback(
   this->get_logger(),
   "Scan callback of %s, merging.. ", topic.c_str());
 
-  laser_scan_to_cloud_deque(scan, topic);
-  update_cloud_queue();
+  if (!this->allow_scan_delay && is_scan_too_old(scan->header.stamp)){
+    RCLCPP_DEBUG(
+      this->get_logger(),
+      "Scan data of %s too old, dicarding scan.. ", topic.c_str());
+    return;
+  }
+  else
+  {  
+    laser_scan_to_cloud_deque(scan, topic);
+    update_cloud_queue();
+    // TODO: clean up old data
+  }
+}
+
+bool LaserscanMerger::is_scan_too_old(const builtin_interfaces::msg::Time stamp_time){
+  double time_diff = abs((this->get_clock()->now() - stamp_time).seconds());
+  if(time_diff > this->max_delay_time_sec)
+    return true;
+  else
+    return false;
 }
 
 void LaserscanMerger::laser_scan_to_cloud_deque(
@@ -153,11 +173,8 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
 
   if (pile_index > 0){
     cloud_deque[pile_index].add(topic_index, pcl_cloud);
-    // latestCloudPile.add(topic_index, pcl_cloud);
-    // yes: add to pile
   }
   else{
-    // no: create new pile
     this->cloud_deque.push_back(
       CloudPile(pcl_cloud, scan->header.stamp, topic_index, subscribed_topics.size()));
   }
@@ -165,16 +182,18 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
 
 int LaserscanMerger::get_matching_pile(int topic_index, builtin_interfaces::msg::Time time_stamp)
 {
-  for (uint i=0; i<cloud_deque.size(); ++i)
+  for (uint i=0; i<cloud_deque.size(); i++)
   {
     if(cloud_deque[i].is_index_filled(topic_index))
     {
       continue;
     }
-    else if(cloud_deque[i].get_stamp_time() == rclcpp::Time(time_stamp))
+    else
     {
-      return i;
-    } 
+      double time_diff = abs((cloud_deque[i].get_stamp_time() - time_stamp).seconds());
+      if (time_diff < this->max_merge_time_diff_sec)
+        return i;
+    }
   }
   return -1;   // no matching index found
 }
@@ -183,7 +202,7 @@ void LaserscanMerger::update_cloud_queue(){
   if (cloud_deque.front().is_complete()){
     publish_latest_cloud_and_scan();
   }
-  else if(abs((this->get_clock()->now() - cloud_deque.front().get_stamp_time()).seconds()) > 0.1){
+  else if(abs((this->get_clock()->now() - cloud_deque.front().get_stamp_time()).seconds()) > 0.05){
     if(this->best_effort_enabled)
       publish_latest_cloud_and_scan();
     else
