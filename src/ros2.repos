@@ -1,5 +1,0 @@
-repositories:
-  perception_pcl:
-    type: git
-    url: https://github.com/ros-perception/perception_pcl
-    version: 2.3.1
