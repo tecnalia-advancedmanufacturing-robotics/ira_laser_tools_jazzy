@@ -66,6 +66,7 @@ private:
   bool allow_scan_delay;            // allow scan to be delayed (max_delay_time_sec)
   double max_delay_time_sec;        // max delay amount of a scan to node time
   double max_merge_time_diff_sec;   // max difference in scan time of merged scans
+  double max_completion_time;       // max amount of time to wait for matching scans
 
   double angle_min;
   double angle_max;

@@ -33,6 +33,7 @@ LaserscanMerger::LaserscanMerger()
   use_inf = this->declare_parameter("use_inf", true);
   inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
   best_effort_enabled = this->declare_parameter<bool>("best_effort", true);
+  max_completion_time = this->declare_parameter<double>("max_completion_time", 0.05);
   allow_scan_delay = this->declare_parameter("allow_scan_delay", false);
   max_delay_time_sec = this->declare_parameter("max_delay_scan_time", 1.0);
   max_merge_time_diff_sec = this->declare_parameter("max_merge_time_diff", 0.05);
@@ -176,7 +177,9 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
   }
   else{
     this->cloud_deque.push_back(
-      CloudPile(pcl_cloud, scan->header.stamp, topic_index, subscribed_topics.size()));
+      CloudPile(pcl_cloud, scan->header.stamp, 
+                this->get_clock()->now(),
+                topic_index, subscribed_topics.size()));
   }
 }
 
@@ -202,7 +205,7 @@ void LaserscanMerger::update_cloud_queue(){
   if (cloud_deque.front().is_complete()){
     publish_latest_cloud_and_scan();
   }
-  else if(abs((this->get_clock()->now() - cloud_deque.front().get_stamp_time()).seconds()) > 0.05){
+  else if(abs((this->get_clock()->now() - cloud_deque.front().get_creation_time()).seconds()) > max_completion_time){
     if(this->best_effort_enabled)
       publish_latest_cloud_and_scan();
     else
