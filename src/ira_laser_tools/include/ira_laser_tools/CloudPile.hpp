@@ -1,5 +1,5 @@
-#ifndef IRA_LASER_TOOLS_CLOUDPILE_HPP_
-#define IRA_LASER_TOOLS_CLOUDPILE_HPP_
+#ifndef IRA_LASER_TOOLS__CLOUDPILE_HPP_
+#define IRA_LASER_TOOLS__CLOUDPILE_HPP_
 
 #include <iostream>
 #include <string>
@@ -16,9 +16,8 @@
 #include "pcl/point_cloud.h"
 
 class CloudPile{
-
   public:
-    CloudPile(pcl::PCLPointCloud2 first_cloud, builtin_interfaces::msg::Time stamp, 
+    CloudPile(pcl::PCLPointCloud2 first_cloud, builtin_interfaces::msg::Time stamp,
               rclcpp::Time creation_time, int index, int size);
     ~CloudPile();
 
@@ -40,4 +39,4 @@ class CloudPile{
 
 
 
-#endif // IRA_LASER_TOOLS_CLOUDPILE_HPP_
+#endif  // IRA_LASER_TOOLS__CLOUDPILE_HPP_

@@ -1,6 +1,6 @@
 #include "ira_laser_tools/CloudPile.hpp"
 
-CloudPile::CloudPile(pcl::PCLPointCloud2 first_cloud, builtin_interfaces::msg::Time scan_stamp, 
+CloudPile::CloudPile(pcl::PCLPointCloud2 first_cloud, builtin_interfaces::msg::Time scan_stamp,
                      rclcpp::Time creation_time, int index, int size)
                       : size(size)
 {
@@ -47,7 +47,7 @@ bool CloudPile::is_index_filled(int index){
 }
 
 rclcpp::Time CloudPile::get_stamp_time(){
-  return this->first_cloud_time_stamp; 
+  return this->first_cloud_time_stamp;
 }
 
 rclcpp::Time CloudPile::get_creation_time(){

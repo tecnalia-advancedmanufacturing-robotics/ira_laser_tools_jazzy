@@ -38,7 +38,7 @@ LaserscanMerger::LaserscanMerger()
   max_delay_time_sec_ = this->declare_parameter("max_delay_scan_time", 1.0);
   max_merge_time_diff_sec_ = this->declare_parameter("max_merge_time_diff", 0.05);
 
-  callback_handle_= this->add_on_set_parameters_callback(
+  callback_handle_ = this->add_on_set_parameters_callback(
     std::bind(&LaserscanMerger::parametersCallback, this, std::placeholders::_1));
 
   topic_parser_timer = this->create_wall_timer(
@@ -260,9 +260,9 @@ bool LaserscanMerger::is_scan_too_old(const builtin_interfaces::msg::Time stamp_
 
 void LaserscanMerger::laser_scan_to_cloud_deque(
   const sensor_msgs::msg::LaserScan::SharedPtr scan,
-  std::string topic){
-
-  pcl::PCLPointCloud2 pcl_cloud; 
+  std::string topic)
+{
+  pcl::PCLPointCloud2 pcl_cloud;
   auto singleScanCloud = laser_scan_to_pointcloud(scan);
   pcl_conversions::toPCL(*singleScanCloud, pcl_cloud);
   int topic_index = get_topic_index(topic);
@@ -271,8 +271,7 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
 
   if (pile_index > 0){
     cloud_deque[pile_index].add(topic_index, pcl_cloud);
-  }
-  else{
+  } else {
     this->cloud_deque.push_back(
       CloudPile(pcl_cloud, scan->header.stamp,
                 this->get_clock()->now(),
@@ -282,14 +281,12 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
 
 int LaserscanMerger::get_matching_pile(int topic_index, builtin_interfaces::msg::Time time_stamp)
 {
-  for (uint i=0; i<cloud_deque.size(); i++)
+for (uint i=0; i<cloud_deque.size(); i++)
   {
     if(cloud_deque[i].is_index_filled(topic_index))
     {
       continue;
-    }
-    else
-    {
+    } else {
       double time_diff = abs((cloud_deque[i].get_stamp_time() - time_stamp).seconds());
       if (time_diff < this->max_merge_time_diff_sec_)
         return i;
@@ -301,8 +298,8 @@ int LaserscanMerger::get_matching_pile(int topic_index, builtin_interfaces::msg:
 void LaserscanMerger::update_cloud_queue(){
   if (cloud_deque.front().is_complete()){
     publish_latest_cloud_and_scan();
-  }
-  else if(abs((this->get_clock()->now() - cloud_deque.front().get_creation_time()).seconds()) > max_completion_time_){
+  } else if(abs((this->get_clock()->now() - cloud_deque.front().get_creation_time()).seconds()) >
+          max_completion_time_){
     if(this->best_effort_enabled_)
       publish_latest_cloud_and_scan();
     else
@@ -321,7 +318,6 @@ int LaserscanMerger::get_topic_index(std::string topic){
 }
 
 void LaserscanMerger::publish_latest_cloud_and_scan(){
-
   auto front_pile = cloud_deque.front();
   pcl::PCLPointCloud2 merged_cloud_pcl = front_pile.merge_to_one_cloud();
 

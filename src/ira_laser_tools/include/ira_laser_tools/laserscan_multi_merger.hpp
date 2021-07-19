@@ -1,5 +1,5 @@
-#ifndef IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
-#define IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
+#ifndef IRA_LASER_TOOLS__LASERSCAN_MULTI_MERGER_HPP_
+#define IRA_LASER_TOOLS__LASERSCAN_MULTI_MERGER_HPP_
 
 #include <iostream>
 #include <algorithm>
@@ -33,7 +33,8 @@ class LaserscanMerger : public rclcpp::Node
 {
 public:
   LaserscanMerger();
-  rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters);
+  rcl_interfaces::msg::SetParametersResult parametersCallback(
+    const std::vector<rclcpp::Parameter> &parameters);
   int get_topic_index(std::string topic);
   void laserscan_topic_parser();
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic);
@@ -94,4 +95,4 @@ private:
 
 }  // namespace laserscan_multi_merger
 
-#endif  // IRA_LASER_TOOLS_LADERSAN_MULTI_MERGER_HPP_
+#endif  // IRA_LASER_TOOLS__LASERSCAN_MULTI_MERGER_HPP_
