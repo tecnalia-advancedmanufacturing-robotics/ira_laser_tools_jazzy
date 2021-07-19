@@ -25,6 +25,7 @@
 
 #include "builtin_interfaces/msg/time.h"
 #include "ira_laser_tools/CloudPile.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 namespace laserscan_multi_merger
 {
@@ -32,6 +33,7 @@ class LaserscanMerger : public rclcpp::Node
 {
 public:
   LaserscanMerger();
+  rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters);
   int get_topic_index(std::string topic);
   void laserscan_topic_parser();
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic);
@@ -46,6 +48,7 @@ public:
   std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 
 private:
+  OnSetParametersCallbackHandle::SharedPtr callback_handle_;
   void clear_cloud_stack();
   void pub_or_delete_clouds();
   void update_cloud_queue();
@@ -63,30 +66,30 @@ private:
   std::vector<std::string> subscribed_topics;
   rclcpp::TimerBase::SharedPtr topic_parser_timer;
 
-  bool allow_scan_delay;            // allow scan to be delayed (max_delay_time_sec)
-  double max_delay_time_sec;        // max delay amount of a scan to node time
-  double max_merge_time_diff_sec;   // max difference in scan time of merged scans
-  double max_completion_time;       // max amount of time to wait for matching scans
+  // Parameters
+  bool best_effort_enabled_;         // publish only completely merged scans
+  bool allow_scan_delay_;            // allow scan to be delayed (max_delay_time_sec_)
+  double max_delay_time_sec_;        // max delay amount of a scan to node time
+  double max_merge_time_diff_sec_;   // max difference in scan time of merged scans
+  double max_completion_time_;       // max amount of time to wait for matching scans
 
-  double angle_min;
-  double angle_max;
-  double angle_increment;
-  double time_increment;
-  double scan_time;
-  double range_min;
-  double range_max;
-  double inf_epsilon;
-  bool use_inf;
+  std::string destination_frame_;
+  std::string cloud_destination_topic_;
+  std::string scan_destination_topic_;
+  std::string laserscan_topics_;
 
-  double min_height;
-  double max_height;
+  double angle_min_;                // individual scan parameters
+  double angle_max_;
+  double angle_increment_;
+  double time_increment_;
+  double scan_time_;
+  double range_min_;
+  double range_max_;
+  double inf_epsilon_;
+  double min_height_;
+  double max_height_;
+  bool use_inf_;
 
-  bool best_effort_enabled;
-
-  std::string destination_frame;
-  std::string cloud_destination_topic;
-  std::string scan_destination_topic;
-  std::string laserscan_topics;
 };
 
 }  // namespace laserscan_multi_merger

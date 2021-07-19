@@ -13,30 +13,33 @@ namespace laserscan_multi_merger
 LaserscanMerger::LaserscanMerger()
 : Node("laser_multi_merger")
 {
-  destination_frame = this->declare_parameter<std::string>("destination_frame", "dest_link");
-  cloud_destination_topic = this->declare_parameter<std::string>(
+  destination_frame_ = this->declare_parameter<std::string>("destination_frame", "dest_link");
+  cloud_destination_topic_ = this->declare_parameter<std::string>(
     "cloud_destination_topic",
     "/merged_cloud");
-  scan_destination_topic = this->declare_parameter<std::string>(
+  scan_destination_topic_ = this->declare_parameter<std::string>(
     "scan_destination_topic",
     "/merged_scan");
-  laserscan_topics = this->declare_parameter<std::string>("laserscan_topics", "");
-  min_height = this->declare_parameter("min_height", std::numeric_limits<double>::min());
-  max_height = this->declare_parameter("max_height", std::numeric_limits<double>::max());
-  angle_min = this->declare_parameter("angle_min", -M_PI);
-  angle_max = this->declare_parameter("angle_max", M_PI);
-  angle_increment = this->declare_parameter("angle_increment", M_PI / 180.0);
-  time_increment = this->declare_parameter("time_increment", 0);
-  scan_time = this->declare_parameter("scan_time", 1.0 / 30.0);
-  range_min = this->declare_parameter("range_min", 0.0);
-  range_max = this->declare_parameter("range_max", std::numeric_limits<double>::max());
-  use_inf = this->declare_parameter("use_inf", true);
-  inf_epsilon = this->declare_parameter("inf_epsilon", 1.0);
-  best_effort_enabled = this->declare_parameter<bool>("best_effort", true);
-  max_completion_time = this->declare_parameter<double>("max_completion_time", 0.05);
-  allow_scan_delay = this->declare_parameter("allow_scan_delay", false);
-  max_delay_time_sec = this->declare_parameter("max_delay_scan_time", 1.0);
-  max_merge_time_diff_sec = this->declare_parameter("max_merge_time_diff", 0.05);
+  laserscan_topics_ = this->declare_parameter<std::string>("laserscan_topics", "");
+  min_height_ = this->declare_parameter("min_height", std::numeric_limits<double>::min());
+  max_height_ = this->declare_parameter("max_height", std::numeric_limits<double>::max());
+  angle_min_ = this->declare_parameter("angle_min", -M_PI);
+  angle_max_ = this->declare_parameter("angle_max", M_PI);
+  angle_increment_ = this->declare_parameter("angle_increment", M_PI / 180.0);
+  time_increment_ = this->declare_parameter("time_increment", 0);
+  scan_time_ = this->declare_parameter("scan_time", 1.0 / 30.0);
+  range_min_ = this->declare_parameter("range_min", 0.0);
+  range_max_ = this->declare_parameter("range_max", std::numeric_limits<double>::max());
+  use_inf_ = this->declare_parameter("use_inf", true);
+  inf_epsilon_ = this->declare_parameter("inf_epsilon", 1.0);
+  best_effort_enabled_ = this->declare_parameter<bool>("best_effort", true);
+  max_completion_time_ = this->declare_parameter<double>("max_completion_time", 0.05);
+  allow_scan_delay_ = this->declare_parameter("allow_scan_delay", false);
+  max_delay_time_sec_ = this->declare_parameter("max_delay_scan_time", 1.0);
+  max_merge_time_diff_sec_ = this->declare_parameter("max_merge_time_diff", 0.05);
+
+  callback_handle_= this->add_on_set_parameters_callback(
+    std::bind(&LaserscanMerger::parametersCallback, this, std::placeholders::_1));
 
   topic_parser_timer = this->create_wall_timer(
     std::chrono::seconds(5), std::bind(&LaserscanMerger::laserscan_topic_parser, this));
@@ -45,9 +48,105 @@ LaserscanMerger::LaserscanMerger()
   this->tfListener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);
 
   point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    this->cloud_destination_topic.c_str(), rclcpp::SystemDefaultsQoS());
+    this->cloud_destination_topic_.c_str(), rclcpp::SystemDefaultsQoS());
   laser_scan_publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>(
-    this->scan_destination_topic.c_str(), rclcpp::SystemDefaultsQoS());
+    this->scan_destination_topic_.c_str(), rclcpp::SystemDefaultsQoS());
+}
+
+rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
+  const std::vector<rclcpp::Parameter> &parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = false;
+  result.reason = "";
+
+  for (const auto &param : parameters)
+  {
+    if (param.get_name() == "best_effort" &&
+        param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+      {
+        best_effort_enabled_ = param.as_bool();
+        result.successful = true;
+      } else if (param.get_name() == "alow_scan_delay" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL){
+        allow_scan_delay_ = param.as_bool();
+        result.successful = true;
+      } else if (param.get_name() == "max_delay_scan_time" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        max_delay_time_sec_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "max_merge_time_diff" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        max_merge_time_diff_sec_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "max_completion_time" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        max_completion_time_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "destination_frame" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
+        destination_frame_ = param.as_string();
+        result.successful = true;
+      } else if (param.get_name() == "cloud_destination_topic" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
+        cloud_destination_topic_ = param.as_string();
+        result.successful = true;
+      } else if (param.get_name() == "scan_destination_topic" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
+        scan_destination_topic_ = param.as_string();
+        result.successful = true;
+      } else if (param.get_name() == "laserscan_topics" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
+        laserscan_topics_ = param.as_string();
+        result.successful = true;
+      } else if (param.get_name() == "angle_min" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        angle_min_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "angle_max" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        angle_max_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "angle_increment" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        angle_increment_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "time_increment" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        time_increment_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "scan_time" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        scan_time_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "range_min" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        range_min_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "range_max" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        range_max_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "inf_epsilon" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        inf_epsilon_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "min_height" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        min_height_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "max_height_" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
+        max_height_ = param.as_double();
+        result.successful = true;
+      } else if (param.get_name() == "use_inf" &&
+                 param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL){
+        use_inf_ = param.as_bool();
+        result.successful = true;
+      }
+  }
+
+  return result;
 }
 
 void LaserscanMerger::laserscan_topic_parser()
@@ -72,7 +171,7 @@ void LaserscanMerger::laserscan_topic_parser()
   if (published_scan_topics.size() == 0)
     return;
 
-  std::istringstream iss(this->laserscan_topics);
+  std::istringstream iss(this->laserscan_topics_);
   std::vector<std::string> tokens((std::istream_iterator<std::string>(
     iss)), std::istream_iterator<std::string>());
   std::vector<std::string> tmp_input_topics;
@@ -139,14 +238,12 @@ void LaserscanMerger::scanCallback(
   this->get_logger(),
   "Scan callback of %s, merging.. ", topic.c_str());
 
-  if (!this->allow_scan_delay && is_scan_too_old(scan->header.stamp)){
+  if (!this->allow_scan_delay_ && is_scan_too_old(scan->header.stamp)){
     RCLCPP_DEBUG(
       this->get_logger(),
       "Scan data of %s too old, dicarding scan.. ", topic.c_str());
     return;
-  }
-  else
-  {  
+  } else {
     laser_scan_to_cloud_deque(scan, topic);
     update_cloud_queue();
     // TODO: clean up old data
@@ -155,7 +252,7 @@ void LaserscanMerger::scanCallback(
 
 bool LaserscanMerger::is_scan_too_old(const builtin_interfaces::msg::Time stamp_time){
   double time_diff = abs((this->get_clock()->now() - stamp_time).seconds());
-  if(time_diff > this->max_delay_time_sec)
+  if(time_diff > this->max_delay_time_sec_)
     return true;
   else
     return false;
@@ -177,7 +274,7 @@ void LaserscanMerger::laser_scan_to_cloud_deque(
   }
   else{
     this->cloud_deque.push_back(
-      CloudPile(pcl_cloud, scan->header.stamp, 
+      CloudPile(pcl_cloud, scan->header.stamp,
                 this->get_clock()->now(),
                 topic_index, subscribed_topics.size()));
   }
@@ -194,7 +291,7 @@ int LaserscanMerger::get_matching_pile(int topic_index, builtin_interfaces::msg:
     else
     {
       double time_diff = abs((cloud_deque[i].get_stamp_time() - time_stamp).seconds());
-      if (time_diff < this->max_merge_time_diff_sec)
+      if (time_diff < this->max_merge_time_diff_sec_)
         return i;
     }
   }
@@ -205,8 +302,8 @@ void LaserscanMerger::update_cloud_queue(){
   if (cloud_deque.front().is_complete()){
     publish_latest_cloud_and_scan();
   }
-  else if(abs((this->get_clock()->now() - cloud_deque.front().get_creation_time()).seconds()) > max_completion_time){
-    if(this->best_effort_enabled)
+  else if(abs((this->get_clock()->now() - cloud_deque.front().get_creation_time()).seconds()) > max_completion_time_){
+    if(this->best_effort_enabled_)
       publish_latest_cloud_and_scan();
     else
       cloud_deque.pop_front();
@@ -244,23 +341,21 @@ void LaserscanMerger::publish_latest_cloud_and_scan(){
 
 sensor_msgs::msg::PointCloud2::SharedPtr LaserscanMerger::laser_scan_to_pointcloud(
   const sensor_msgs::msg::LaserScan::SharedPtr scan){
-
-  RCLCPP_DEBUG(
-  this->get_logger(), "Transforming laserscan to pointcloud..");
+  RCLCPP_DEBUG(this->get_logger(), "Transforming laserscan to pointcloud..");
 
   auto singleScanCloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
   // transform scan if necessary
-  // if (scan->header.frame_id != destination_frame){}
+  // if (scan->header.frame_id != destination_frame_){}
   tf2::TimePoint time_point = tf2_ros::fromMsg(scan->header.stamp);
   bool canTransform = tf_buffer_->canTransform(
-    destination_frame.c_str(), scan->header.frame_id.c_str(), time_point,
+    destination_frame_.c_str(), scan->header.frame_id.c_str(), time_point,
     tf2::durationFromSec(1.0));
   if (!canTransform) {
     RCLCPP_WARN(
       this->get_logger(),
       "Could not look up transform from %s to %s at time [%d.%d]",
-      scan->header.frame_id.c_str(), destination_frame.c_str(),
+      scan->header.frame_id.c_str(), destination_frame_.c_str(),
       scan->header.stamp.sec, scan->header.stamp.nanosec);
   } else {
     RCLCPP_DEBUG(
@@ -268,7 +363,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr LaserscanMerger::laser_scan_to_pointclo
       "Transform available");
   }
   projector_.transformLaserScanToPointCloud(
-    destination_frame.c_str(), *scan, *singleScanCloud, *tf_buffer_);
+    destination_frame_.c_str(), *scan, *singleScanCloud, *tf_buffer_);
 
   return singleScanCloud;
 }
@@ -287,24 +382,24 @@ sensor_msgs::msg::LaserScan::UniquePtr LaserscanMerger::pointcloud_to_laserscan(
     return scan_msg;
 
   scan_msg->header = cloud_msg->header;
-  scan_msg->angle_min = this->angle_min;
-  scan_msg->angle_max = this->angle_max;
-  scan_msg->angle_increment = this->angle_increment;
-  scan_msg->time_increment = this->time_increment;
-  scan_msg->scan_time = this->scan_time;
-  scan_msg->range_min = this->range_min;
-  scan_msg->range_max = this->range_max;
+  scan_msg->angle_min = this->angle_min_;
+  scan_msg->angle_max = this->angle_max_;
+  scan_msg->angle_increment = this->angle_increment_;
+  scan_msg->time_increment = this->time_increment_;
+  scan_msg->scan_time = this->scan_time_;
+  scan_msg->range_min = this->range_min_;
+  scan_msg->range_max = this->range_max_;
 
   // determine amount of rays to create
   uint32_t ranges_size = std::ceil(
     (scan_msg->angle_max - scan_msg->angle_min) / scan_msg->angle_increment);
 
-  if (this->use_inf) {
+  if (this->use_inf_) {
     scan_msg->ranges.assign(
       ranges_size,
       std::numeric_limits<double>::infinity());
   } else {
-    scan_msg->ranges.assign(ranges_size, scan_msg->range_max + inf_epsilon);
+    scan_msg->ranges.assign(ranges_size, scan_msg->range_max + inf_epsilon_);
   }
 
   // Iterate through pointcloud
@@ -320,27 +415,27 @@ sensor_msgs::msg::LaserScan::UniquePtr LaserscanMerger::pointcloud_to_laserscan(
       continue;
     }
 
-    if (*iter_z > max_height || *iter_z < min_height) {
+    if (*iter_z > max_height_ || *iter_z < min_height_) {
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for height %f not in range (%f, %f)\n",
-        *iter_z, min_height, max_height);
+        *iter_z, min_height_, max_height_);
       continue;
     }
 
     double range = hypot(*iter_x, *iter_y);
-    if (range < range_min) {
+    if (range < range_min_) {
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for range %f below minimum value %f. Point: (%f, %f, %f)",
-        range, range_min, *iter_x, *iter_y, *iter_z);
+        range, range_min_, *iter_x, *iter_y, *iter_z);
       continue;
     }
-    if (range > range_max) {
+    if (range > range_max_) {
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for range %f above maximum value %f. Point: (%f, %f, %f)",
-        range, range_max, *iter_x, *iter_y, *iter_z);
+        range, range_max_, *iter_x, *iter_y, *iter_z);
       continue;
     }
 
