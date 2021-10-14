@@ -328,9 +328,9 @@ void LaserscanMerger::publish_latest_cloud_and_scan(){
 
   this->point_cloud_publisher_->publish(*cloud_msg);
   auto merged_scan_msg = pointcloud_to_laserscan(cloud_msg);
-    if (merged_scan_msg){
-      this->laser_scan_publisher_->publish(std::move(merged_scan_msg));
-    }
+  if (merged_scan_msg){
+    this->laser_scan_publisher_->publish(std::move(merged_scan_msg));
+  }
 }
 
 /* Basic conversions */
@@ -373,9 +373,7 @@ sensor_msgs::msg::LaserScan::UniquePtr LaserscanMerger::pointcloud_to_laserscan(
   // https://github.com/ros-perception/pointcloud_to_laserscan/blob/554173b73f7b5fd2e4d9218b1096cb4c7dcbae1c/src/pointcloud_to_laserscan_node.cpp#L137
   // build laserscan output
   auto scan_msg = std::make_unique<sensor_msgs::msg::LaserScan>();
-  // check if cloud_msg is available
-  if (!cloud_msg)
-    return scan_msg;
+  scan_msg->header = cloud_msg->header;
 
   scan_msg->header = cloud_msg->header;
   scan_msg->angle_min = this->angle_min_;
@@ -411,7 +409,7 @@ sensor_msgs::msg::LaserScan::UniquePtr LaserscanMerger::pointcloud_to_laserscan(
       continue;
     }
 
-    if (*iter_z > max_height_ || *iter_z < min_height_) {
+    if (*iter_z > max_height_ || *iter_z < min_height_) { // comparison -0.0f < 0.0d returns true?
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for height %f not in range (%f, %f)\n",
