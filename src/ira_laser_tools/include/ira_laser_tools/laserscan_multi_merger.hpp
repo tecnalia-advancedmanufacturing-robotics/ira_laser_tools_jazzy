@@ -50,6 +50,7 @@ public:
 
 private:
   OnSetParametersCallbackHandle::SharedPtr callback_handle_;
+  void parse_namespace(std::string &ref, bool trailing_slash);
   void clear_cloud_stack();
   void pub_or_delete_clouds();
   void update_cloud_queue();

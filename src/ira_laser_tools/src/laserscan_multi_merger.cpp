@@ -41,6 +41,7 @@ LaserscanMerger::LaserscanMerger()
   callback_handle_ = this->add_on_set_parameters_callback(
     std::bind(&LaserscanMerger::parametersCallback, this, std::placeholders::_1));
 
+  this->parse_namespace(destination_frame_, false);
   topic_parser_timer = this->create_wall_timer(
     std::chrono::seconds(5), std::bind(&LaserscanMerger::laserscan_topic_parser, this));
 
@@ -86,6 +87,7 @@ rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
       } else if (param.get_name() == "destination_frame" &&
                  param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
         destination_frame_ = param.as_string();
+        parse_namespace(destination_frame_, false);
         result.successful = true;
       } else if (param.get_name() == "cloud_destination_topic" &&
                  param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
@@ -99,6 +101,7 @@ rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
                  param.get_type() == rclcpp::ParameterType::PARAMETER_STRING){
         laserscan_topics_ = param.as_string();
         result.successful = true;
+        laserscan_topic_parser();
       } else if (param.get_name() == "angle_min" &&
                  param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE){
         angle_min_ = param.as_double();
@@ -149,6 +152,17 @@ rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
   return result;
 }
 
+void LaserscanMerger::parse_namespace(std::string &ref, bool trailing_slash=true){
+  //Check token format and add namespace (will be added to subscription automatically)
+  std::string ns = this->get_namespace();
+  if (ref.find_first_of('/') != 0)
+    ref.insert(0, 1, '/');
+  if (ns.length() > 1)
+    ref.insert(0, ns);
+  if (!trailing_slash && ref.find_first_of('/') == 0)
+    ref.erase(0,1);
+}
+
 void LaserscanMerger::laserscan_topic_parser()
 {
   RCLCPP_DEBUG( this->get_logger(), "Parsing topics..");
@@ -160,11 +174,7 @@ void LaserscanMerger::laserscan_topic_parser()
   std::vector<std::string> published_scan_topics;
   for (auto const & topic : topics) {
     if (topic.second[0].compare("sensor_msgs/msg/LaserScan") == 0) {
-      std::string topic_name = topic.first;
-      if (topic_name.at(0) == '/') {
-        topic_name = topic_name.substr(1);
-      }
-      published_scan_topics.push_back(topic_name);
+      published_scan_topics.push_back(topic.first);
     }
   }
 
@@ -175,6 +185,15 @@ void LaserscanMerger::laserscan_topic_parser()
   std::vector<std::string> tokens((std::istream_iterator<std::string>(
     iss)), std::istream_iterator<std::string>());
   std::vector<std::string> tmp_input_topics;
+
+  //Check token format and add namespace (will be added to subscription automatically)
+  std::string ns = this->get_namespace();
+  for (auto & token: tokens){
+    parse_namespace(token);
+  }
+
+  // Adapt destination frame
+  // parse_namespace(destination_frame_, false);
 
   // make sure missing topics are published LaserScan topics
   for (auto const & token : tokens) {
@@ -355,11 +374,10 @@ sensor_msgs::msg::PointCloud2::SharedPtr LaserscanMerger::laser_scan_to_pointclo
       scan->header.stamp.sec, scan->header.stamp.nanosec);
   } else {
     RCLCPP_DEBUG(
-      this->get_logger(),
-      "Transform available");
+      this->get_logger(), "Transform available");
+    projector_.transformLaserScanToPointCloud(
+      destination_frame_.c_str(), *scan, *singleScanCloud, *tf_buffer_);
   }
-  projector_.transformLaserScanToPointCloud(
-    destination_frame_.c_str(), *scan, *singleScanCloud, *tf_buffer_);
 
   return singleScanCloud;
 }
