@@ -49,9 +49,9 @@ LaserscanMerger::LaserscanMerger()
   this->tfListener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);
 
   point_cloud_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    this->cloud_destination_topic_.c_str(), rclcpp::SystemDefaultsQoS());
+    this->cloud_destination_topic_.c_str(), rclcpp::SensorDataQoS());
   laser_scan_publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>(
-    this->scan_destination_topic_.c_str(), rclcpp::SystemDefaultsQoS());
+    this->scan_destination_topic_.c_str(), rclcpp::SensorDataQoS());
 }
 
 rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
@@ -152,15 +152,23 @@ rcl_interfaces::msg::SetParametersResult LaserscanMerger::parametersCallback(
   return result;
 }
 
-void LaserscanMerger::parse_namespace(std::string &ref, bool trailing_slash=true){
-  //Check token format and add namespace (will be added to subscription automatically)
+void LaserscanMerger::parse_namespace(std::string &ref, bool leading_slash=true){
   std::string ns = this->get_namespace();
   if (ref.find_first_of('/') != 0)
+  {
+    // reference string needs a '/' to begin with, to be either global or local when namespace is added 
     ref.insert(0, 1, '/');
+  }
+  // if a namespace exists, it must be added to the reference string
   if (ns.length() > 1)
+  {
     ref.insert(0, ns);
-  if (!trailing_slash && ref.find_first_of('/') == 0)
+  }
+  // leading slash not allowed, for example for frames
+  if (!leading_slash && ref.find_first_of('/') == 0)
+  {
     ref.erase(0,1);
+  }
 }
 
 void LaserscanMerger::laserscan_topic_parser()
